@@ -3,7 +3,7 @@
     "targets": ["omnifocus"],
     "author": "Donie",
     "identifier": "org.0x3f.reschedule_objects",
-    "version": "1.1.1",
+    "version": "2.0",
     "description": "Reschedule timescales of the selected tasks/projects.",
     "label": "Reschedule timescales",
     "shortLabel": "Reschedule timescales",
@@ -11,108 +11,98 @@
     "image": "digitalcrown.arrow.counterclockwise"
 }*/
 (() => {
-    const FORM_TITLE   = "Reschedule Timescales";
-    const BUTTON_LABEL = "Arrange";
+    const preferences = new Preferences();
 
-    const FIELD_DATE       = "date";
-    const FIELD_TIMESCALES = "timescales";
+    const devPlugin = PlugIn.find('org.0x3f.libdev');
 
-    const LABEL_DATE      = "Date";
-    const LABEL_TIMESCALE = "Timescale";
+    if (devPlugin === null) {
+        throw new Error('Dev library plugin not installed.');
+    }
 
-    const PREF_LAST_SELECTED_TIMESCALE = "lastSelectedTimescale";
+    const libdev = devPlugin.library('libdev');
 
-    const TIMESCALE_MORNING   = "morning";
-    const TIMESCALE_NOON      = "noon";
-    const TIMESCALE_AFTERNOON = "afternoon";
-    const TIMESCALE_EVENING   = "evening";
-    const TIMESCALE_DAYTIME   = "daytime";
-    const TIMESCALE_WHOLE_DAY = "whole_day";
+    const FIELD_DATE       = 'date';
+    const FIELD_TIMESCALES = 'timescales';
+
+    const PREF_LAST_SELECTED_TIMESCALE = 'lastSelectedTimescale';
+
+    const TIMESCALE_MORNING   = 'morning';
+    const TIMESCALE_NOON      = 'noon';
+    const TIMESCALE_AFTERNOON = 'afternoon';
+    const TIMESCALE_EVENING   = 'evening';
+    const TIMESCALE_DAYTIME   = 'daytime';
+    const TIMESCALE_WHOLE_DAY = 'whole_day';
 
     const TIMESCALES = {
-        TIMESCALE_MORNING:   { from: "9:00 AM",  to: "12:00 PM" },
-        TIMESCALE_NOON:      { from: "12:00 PM", to: "14:00" },
-        TIMESCALE_AFTERNOON: { from: "14:00",    to: "18:30" },
-        TIMESCALE_EVENING:   { from: "18:30",    to: "23:00" },
-        TIMESCALE_DAYTIME:   { from: "9:00 AM",  to: "18:30" },
-        TIMESCALE_WHOLE_DAY: { from: "9:00 AM",  to: "23:00" },
+        TIMESCALE_MORNING:   { from: '9:00 AM',  to: '12:00 PM' },
+        TIMESCALE_NOON:      { from: '12:00 PM', to: '14:00' },
+        TIMESCALE_AFTERNOON: { from: '14:00',    to: '18:30' },
+        TIMESCALE_EVENING:   { from: '18:30',    to: '23:00' },
+        TIMESCALE_DAYTIME:   { from: '9:00 AM',  to: '18:30' },
+        TIMESCALE_WHOLE_DAY: { from: '9:00 AM',  to: '23:00' },
     };
-
-    let preferences = new Preferences();
 
     var action = new PlugIn.Action(function (selection, sender) {
         try {
-            let form = new Form();
+            const form = new Form();
 
-            let defaultDate = new Date;
+            const defaultDate = new Date;
             defaultDate.setHours(0, 0, 0, 0);
 
-            let dateInput = new Form.Field.Date(FIELD_DATE, LABEL_DATE, defaultDate);
+            const dateInput = new Form.Field.Date(FIELD_DATE, 'Date', defaultDate);
 
             form.addField(dateInput);
 
-            let menuItems = [
-                "Morning",
-                "Noon",
-                "Afternoon",
-                "Evening",
-                "Daytime",
-                "Whole Day",
+            let timescales = [
+                'Morning',
+                'Noon',
+                'Afternoon',
+                'Evening',
+                'Daytime',
+                'Whole Day',
             ];
 
-            menuItems = menuItems.map((item, index) => {
-                return item + " (" + Object.values(TIMESCALES)[index].from + " - " + Object.values(TIMESCALES)[index].to + ")";
+            timescales = timescales.map((item, index) => {
+                return item + ' (' + Object.values(TIMESCALES)[index].from + ' - ' + Object.values(TIMESCALES)[index].to + ')';
             });
 
-            let lastSelectedTimescale = preferences.readString(
-                PREF_LAST_SELECTED_TIMESCALE
-            );
+            const lastSelectedTimescale = libdev.getString(preferences, PREF_LAST_SELECTED_TIMESCALE, Object.keys(TIMESCALES)[0]);
 
-            let selectedKey = lastSelectedTimescale;
-            if (selectedKey === null) {
-                selectedKey = Object.keys(TIMESCALES)[0];
-            }
-
-            let timescaleMenu = new Form.Field.Option(
+            const timescaleOption = new Form.Field.Option(
                 FIELD_TIMESCALES,
-                LABEL_TIMESCALE,
+                'Timescale',
                 Object.keys(TIMESCALES),
-                menuItems,
-                selectedKey
+                timescales,
+                lastSelectedTimescale
             );
 
-            form.addField(timescaleMenu);
+            form.addField(timescaleOption);
 
-            let formPromise = form.show(FORM_TITLE, BUTTON_LABEL);
+            form.validate = function (formObject) { return true; };
 
-            form.validate = function (formObject) {
-                return true;
-            };
+            const formPromise = form.show('Reschedule Timescales', 'Arrange');
 
             formPromise.then((formObject) => {
-                let date      = formObject.values[FIELD_DATE];
-                let timescale = formObject.values[FIELD_TIMESCALES];
+                const date      = formObject.values[FIELD_DATE];
+                const timescale = formObject.values[FIELD_TIMESCALES];
 
                 selection.allObjects.forEach((object) => {
                     if ((!(object instanceof Task) && !(object instanceof Project)) || object.completed === true) {
                         return;
                     }
 
-                    let newDeferDate = new Date(
-                        date.toDateString() + " " + TIMESCALES[timescale].from
+                    const newDeferDate = new Date(
+                        date.toDateString() + ' ' + TIMESCALES[timescale].from
                     );
-                    let newDueDate = new Date(
-                        date.toDateString() + " " + TIMESCALES[timescale].to
+                    const newDueDate = new Date(
+                        date.toDateString() + ' ' + TIMESCALES[timescale].to
                     );
 
                     object.deferDate = newDeferDate;
                     object.dueDate   = newDueDate;
                 });
 
-                preferences.write(
-                    PREF_LAST_SELECTED_TIMESCALE,
-                    timescale
-                );
+                preferences.write(PREF_LAST_SELECTED_TIMESCALE, timescale);
             });
         } catch (err) {
             new Alert(err.name, err.message).show();
